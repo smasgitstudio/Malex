@@ -1,0 +1,5 @@
+.env
+**.zip
+!simkl/**.zip
+!requirements.txt
+playground*.ps1

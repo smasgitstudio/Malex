@@ -1,0 +1,40 @@
+name: Automatically backup the lists
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * SUN"
+  push:
+    paths:
+      - './script.ps1'
+jobs:
+  RunScript:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+      - name: Load secrets to environment variables
+        uses: oNaiPs/secrets-to-env-action@v1
+        with:
+          secrets: ${{ toJSON(secrets) }}
+      - name: Run PowerShell script
+        shell: pwsh
+        run: ./script.ps1
+      - name: Commit changes
+        shell: pwsh
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          # Tell git to add all XML file to staging, ignore if file contains "Scrape failed" inside
+          Get-ChildItem -Path "*" -Filter "*.xml" -File  -Recurse | ForEach-Object {
+            $inside = Get-Content $_.FullName
+            if ($inside -contains "Scrape failed") {
+              Write-Host "Skipping file: $_"
+            } else {
+              git add $_.FullName
+            }
+          }
+          Get-ChildItem -Path "*" -Exclude "*.xml" -File -Recurse | ForEach-Object {
+            git add $_.FullName
+          }
+          git commit -m "Backup lists, $(Get-Date -AsUtc -Format 'yyyy-MM-ddTHH:mm:ssZ')"
+          git push
